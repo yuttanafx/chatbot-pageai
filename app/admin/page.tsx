@@ -8,7 +8,6 @@ type Product = {
   price: number; stock: number; image_url: string; is_active: boolean;
 };
 type Settings = {
-  shop_id: string;
   shop_name: string; system_prompt: string; admin_username: string; ai_provider: string;
   ai_style: string;
   anthropic_api_key: string; openai_api_key: string; gemini_api_key: string;
@@ -172,10 +171,8 @@ function NeuralCanvas() {
 }
 
 function LoginForm({ onLogin }: { onLogin: () => void }) {
-  const [mode, setMode] = useState<"login" | "signup">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [shopName, setShopName] = useState("");
   const [error, setError] = useState("");
   const [firstSetup, setFirstSetup] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -183,24 +180,19 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(""); setLoading(true);
-
-    const endpoint = mode === "signup" ? "/api/admin/signup" : "/api/admin/login";
-    const payload = mode === "signup"
-      ? { username, password, shop_name: shopName }
-      : { username, password };
-
-    const res = await fetch(endpoint, {
+    const res = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ username, password }),
     });
     setLoading(false);
     if (res.ok) {
-      if (mode === "signup") { setFirstSetup(true); setTimeout(onLogin, 1800); }
+      const d = await res.json();
+      if (d.firstSetup) { setFirstSetup(true); setTimeout(onLogin, 1800); }
       else onLogin();
     } else {
       const d = await res.json();
-      setError(d.error ?? "ทำรายการไม่สำเร็จ");
+      setError(d.error ?? "เข้าสู่ระบบไม่สำเร็จ");
     }
   }
 
@@ -267,51 +259,14 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
           {firstSetup ? (
             <div style={{ textAlign: "center", padding: "16px 0" }}>
               <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
-              <p style={{ color: "rgba(0,220,255,0.9)", fontWeight: 600, margin: 0 }}>สร้างร้านสำเร็จ!</p>
+              <p style={{ color: "rgba(0,220,255,0.9)", fontWeight: 600, margin: 0 }}>ตั้งค่าสำเร็จ!</p>
               <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginTop: 4 }}>กำลังเข้าสู่ระบบ...</p>
             </div>
           ) : (
             <>
-              <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
-                {(["login", "signup"] as const).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => { setMode(m); setError(""); }}
-                    style={{
-                      flex: 1, padding: "8px 0", borderRadius: 8, cursor: "pointer",
-                      border: mode === m ? "1px solid rgba(0,200,255,0.5)" : "1px solid rgba(255,255,255,0.08)",
-                      background: mode === m ? "rgba(0,150,255,0.12)" : "transparent",
-                      color: mode === m ? "rgba(0,220,255,0.95)" : "rgba(255,255,255,0.4)",
-                      fontSize: 12, fontWeight: 600,
-                    }}
-                  >
-                    {m === "login" ? "เข้าสู่ระบบ" : "สร้างร้านใหม่"}
-                  </button>
-                ))}
-              </div>
-
-              <h1 style={{ color: "rgba(255,255,255,0.95)", fontSize: 20, fontWeight: 600, margin: "0 0 20px 0" }}>
-                {mode === "login" ? "เข้าสู่ระบบร้านของคุณ" : "สมัครร้านใหม่"}
-              </h1>
+              <h1 style={{ color: "rgba(255,255,255,0.95)", fontSize: 20, fontWeight: 600, margin: "0 0 20px 0" }}>เข้าสู่ระบบ</h1>
 
               <form onSubmit={handleSubmit}>
-                {mode === "signup" && (
-                  <div style={{ position: "relative", marginBottom: 12 }}>
-                    <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "rgba(0,200,255,0.5)", fontSize: 9, fontWeight: 700, letterSpacing: "0.1em" }}>SHOP</div>
-                    <input
-                      value={shopName} onChange={(e) => setShopName(e.target.value)}
-                      placeholder="ชื่อร้านค้า"
-                      style={{
-                        width: "100%", boxSizing: "border-box",
-                        background: "rgba(255,255,255,0.04)", border: "1px solid rgba(0,180,255,0.2)",
-                        borderRadius: 10, paddingLeft: 48, paddingRight: 12, paddingTop: 10, paddingBottom: 10,
-                        color: "rgba(255,255,255,0.9)", fontSize: 13, fontFamily: "monospace", outline: "none"
-                      }}
-                    />
-                  </div>
-                )}
-
                 <div style={{ position: "relative", marginBottom: 12 }}>
                   <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "rgba(0,200,255,0.5)", fontSize: 9, fontWeight: 700, letterSpacing: "0.1em" }}>USER</div>
                   <input
@@ -330,7 +285,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
                   <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "rgba(0,200,255,0.5)", fontSize: 9, fontWeight: 700, letterSpacing: "0.1em" }}>PASS</div>
                   <input
                     type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                    placeholder={mode === "signup" ? "อย่างน้อย 6 ตัวอักษร" : "••••••••"}
+                    placeholder="••••••••"
                     style={{
                       width: "100%", boxSizing: "border-box",
                       background: "rgba(255,255,255,0.04)", border: "1px solid rgba(0,180,255,0.2)",
@@ -358,19 +313,17 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
                 >
                   {loading ? (
                     <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                      <span>{mode === "signup" ? "กำลังสร้างร้าน" : "กำลังตรวจสอบ"}</span>
+                      <span>กำลังตรวจสอบ</span>
                       <span style={{ display: "inline-flex", gap: 3 }}>
                         {[0, 1, 2].map((i) => <span key={i} style={{ width: 4, height: 4, borderRadius: "50%", background: "white", display: "inline-block", opacity: 0.6 }} />)}
                       </span>
                     </span>
-                  ) : mode === "signup" ? "สร้างร้านใหม่" : "เข้าสู่ระบบ"}
+                  ) : "เข้าสู่ระบบ"}
                 </button>
               </form>
 
               <p style={{ color: "rgba(255,255,255,0.15)", fontSize: 10, textAlign: "center", marginTop: 16, marginBottom: 0 }}>
-                {mode === "signup"
-                  ? "แต่ละร้านมี Facebook Page / LINE OA / สินค้าแยกกันอิสระ"
-                  : "ยังไม่มีร้าน? กดแท็บ \"สร้างร้านใหม่\" ด้านบน"}
+                เข้าครั้งแรก? ใส่ username/password ที่ต้องการได้เลย
               </p>
             </>
           )}
@@ -440,39 +393,6 @@ function ImageUpload({ value, onChange }: { value: string; onChange: (url: strin
           <span className="text-white text-xs opacity-0 group-hover:opacity-100">เปลี่ยนรูป</span>
         </div>
       )}
-    </div>
-  );
-}
-
-// ========== Webhook URL box (copy button) ==========
-function WebhookUrlBox({ path }: { path: string }) {
-  const [copied, setCopied] = useState(false);
-  const [origin, setOrigin] = useState("");
-
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
-
-  if (!path) {
-    return <p className="text-xs text-ink/30">กำลังโหลด...</p>;
-  }
-
-  const fullUrl = `${origin}${path}`;
-
-  return (
-    <div className="flex items-center gap-2">
-      <code className="flex-1 bg-line px-2 py-1.5 rounded text-xs break-all">{fullUrl}</code>
-      <button
-        type="button"
-        onClick={() => {
-          navigator.clipboard.writeText(fullUrl);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        }}
-        className="text-xs bg-ink text-paper px-2.5 py-1.5 rounded-lg hover:bg-moss transition flex-shrink-0"
-      >
-        {copied ? "คัดลอกแล้ว ✓" : "คัดลอก"}
-      </button>
     </div>
   );
 }
@@ -555,20 +475,14 @@ function SettingsTab() {
         <h2 className="font-display text-base">Facebook Messenger</h2>
         {field("facebook_page_access_token", "Page Access Token", "password")}
         {field("facebook_verify_token", "Verify Token")}
-        <div>
-          <p className="text-xs text-ink/50 mb-1">Webhook URL ของร้านนี้ (ใส่ในหน้า Facebook Developer)</p>
-          <WebhookUrlBox path={s.shop_id ? `/api/webhook/facebook/${s.shop_id}` : ""} />
-        </div>
+        <p className="text-xs text-ink/30">Webhook URL: <code className="bg-line px-1 rounded">/api/webhook/facebook</code></p>
       </section>
 
       <section className="bg-white border border-line rounded-2xl p-5 grid gap-3">
         <h2 className="font-display text-base">LINE Official Account</h2>
         {field("line_channel_access_token", "Channel Access Token", "password")}
         {field("line_channel_secret", "Channel Secret", "password")}
-        <div>
-          <p className="text-xs text-ink/50 mb-1">Webhook URL ของร้านนี้ (ใส่ในหน้า LINE Developers)</p>
-          <WebhookUrlBox path={s.shop_id ? `/api/webhook/line/${s.shop_id}` : ""} />
-        </div>
+        <p className="text-xs text-ink/30">Webhook URL: <code className="bg-line px-1 rounded">/api/webhook/line</code></p>
       </section>
 
       <section className="bg-white border border-line rounded-2xl p-5 grid gap-3">

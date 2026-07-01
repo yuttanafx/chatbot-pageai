@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { isAuthed, getAuthedShopId } from "@/lib/auth";
+import { isAuthed } from "@/lib/auth";
 
 export async function GET() {
   if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const shopId = getAuthedShopId();
-  if (!shopId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   try {
     const db = supabaseAdmin();
     const { data, error } = await db
       .from("products")
       .select("*")
-      .eq("shop_id", shopId)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -28,8 +25,6 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const shopId = getAuthedShopId();
-  if (!shopId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   try {
     const body = await req.json();
@@ -37,7 +32,6 @@ export async function POST(req: NextRequest) {
     const { data, error } = await db
       .from("products")
       .insert({
-        shop_id: shopId,
         name: body.name,
         description: body.description ?? "",
         price: body.price ?? 0,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyLogin, setAuthCookie, clearAuthCookie } from "@/lib/auth";
+import { verifyLogin, setupFirstAdmin, setAuthCookie, clearAuthCookie } from "@/lib/auth";
+import { getSettings } from "@/lib/settings";
 
 export async function POST(req: NextRequest) {
   const { username, password } = await req.json();
@@ -9,11 +10,21 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await verifyLogin(username, password);
-    if (!result) {
+    const settings = await getSettings();
+
+    // ครั้งแรก (setup) — ตั้งรหัสผ่านใหม่เลย
+    if (!settings.is_setup_done) {
+      await setupFirstAdmin(username, password);
+      setAuthCookie(username);
+      return NextResponse.json({ ok: true, firstSetup: true });
+    }
+
+    const valid = await verifyLogin(username, password);
+    if (!valid) {
       return NextResponse.json({ error: "username หรือ password ไม่ถูกต้อง" }, { status: 401 });
     }
-    setAuthCookie(result.shopId, username);
+
+    setAuthCookie(username);
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
