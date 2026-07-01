@@ -1,22 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
-import { setAuthCookie, clearAuthCookie } from "@/lib/auth";
+import { verifyLogin, setupFirstAdmin, setAuthCookie, clearAuthCookie } from "@/lib/auth";
+import { getSettings } from "@/lib/settings";
 
 export async function POST(req: NextRequest) {
-  const { password } = await req.json();
+  const { username, password } = await req.json();
 
-  if (!process.env.ADMIN_PASSWORD) {
-    return NextResponse.json(
-      { error: "เซิร์ฟเวอร์ยังไม่ได้ตั้งค่า ADMIN_PASSWORD" },
-      { status: 500 }
-    );
+  if (!username || !password) {
+    return NextResponse.json({ error: "กรุณากรอก username และ password" }, { status: 400 });
   }
 
-  if (password !== process.env.ADMIN_PASSWORD) {
-    return NextResponse.json({ error: "รหัสผ่านไม่ถูกต้อง" }, { status: 401 });
-  }
+  try {
+    const settings = await getSettings();
 
-  setAuthCookie(password);
-  return NextResponse.json({ ok: true });
+    // ครั้งแรก (setup) — ตั้งรหัสผ่านใหม่เลย
+    if (!settings.is_setup_done) {
+      await setupFirstAdmin(username, password);
+      setAuthCookie(username);
+      return NextResponse.json({ ok: true, firstSetup: true });
+    }
+
+    const valid = await verifyLogin(username, password);
+    if (!valid) {
+      return NextResponse.json({ error: "username หรือ password ไม่ถูกต้อง" }, { status: 401 });
+    }
+
+    setAuthCookie(username);
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
 }
 
 export async function DELETE() {
