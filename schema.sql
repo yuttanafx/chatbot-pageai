@@ -63,3 +63,16 @@ create table if not exists shop_settings (
 );
 
 insert into shop_settings (id) values (1) on conflict (id) do nothing;
+
+-- Supabase Storage bucket สำหรับรูปสินค้า
+-- รันใน SQL Editor เช่นกัน
+insert into storage.buckets (id, name, public)
+values ('product-images', 'product-images', true)
+on conflict (id) do nothing;
+
+-- อนุญาตให้ upload ได้จาก server (service role)
+create policy "service role upload" on storage.objects
+  for insert to service_role using (bucket_id = 'product-images');
+
+create policy "public read" on storage.objects
+  for select to public using (bucket_id = 'product-images');
