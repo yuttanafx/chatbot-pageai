@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthed } from "@/lib/auth";
-import { getSettings, updateSettings } from "@/lib/settings";
-import { hashPassword } from "@/lib/auth";
+import { isAuthed, getAuthedShopId, hashPassword } from "@/lib/auth";
+import { getShopById, updateShop } from "@/lib/settings";
 
 export async function GET() {
   if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const shopId = getAuthedShopId();
+  if (!shopId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const s = await getSettings();
+  const s = await getShopById(shopId);
 
   // ซ่อน key จริง — ส่งแค่ว่าตั้งค่าไว้แล้วหรือยัง + 4 ตัวสุดท้าย
   function maskKey(key: string) {
@@ -15,6 +16,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
+    shop_id: s.id,
     shop_name: s.shop_name,
     system_prompt: s.system_prompt,
     admin_username: s.admin_username,
@@ -32,6 +34,8 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const shopId = getAuthedShopId();
+  if (!shopId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await req.json();
   const patch: Record<string, any> = {};
@@ -55,15 +59,14 @@ export async function PUT(req: NextRequest) {
     }
   }
 
-  // เปลี่ยนรหัสผ่าน Admin
+  // เปลี่ยนรหัสผ่าน Admin ของร้านนี้
   if (body.new_username && body.new_password) {
     patch.admin_username      = body.new_username;
     patch.admin_password_hash = hashPassword(body.new_password);
-    patch.is_setup_done       = true;
   }
 
   try {
-    await updateSettings(patch);
+    await updateShop(shopId, patch);
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
