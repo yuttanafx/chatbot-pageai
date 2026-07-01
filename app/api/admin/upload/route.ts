@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthed } from "@/lib/auth";
+import { isAuthed, getAuthedShopId } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const shopId = getAuthedShopId();
+  if (!shopId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
@@ -21,7 +23,8 @@ export async function POST(req: NextRequest) {
   }
 
   const ext = file.name.split(".").pop() ?? "jpg";
-  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  // แยกโฟลเดอร์ตามร้าน กันไฟล์ปนกันระหว่างร้าน
+  const filename = `${shopId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
   const db = supabaseAdmin();
   const { error } = await db.storage

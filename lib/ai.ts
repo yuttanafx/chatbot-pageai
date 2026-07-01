@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase";
-import { getSettings } from "@/lib/settings";
+import type { Shop } from "@/lib/settings";
 import { callAnthropic } from "@/lib/providers/anthropic";
 import { callOpenAI } from "@/lib/providers/openai";
 import { callGemini } from "@/lib/providers/gemini";
@@ -24,21 +24,22 @@ const STYLE_PRESETS: Record<string, { temperature: number; tone: string }> = {
   },
 };
 
-export async function generateReply(history: ChatMsg[]): Promise<string> {
+export async function generateReply(shop: Shop, history: ChatMsg[]): Promise<string> {
   const db = supabaseAdmin();
 
-  const [{ data: products }, settings] = await Promise.all([
-    db.from("products").select("name, description, price, stock").eq("is_active", true),
-    getSettings(),
-  ]);
+  const { data: products } = await db
+    .from("products")
+    .select("name, description, price, stock")
+    .eq("shop_id", shop.id)
+    .eq("is_active", true);
 
   const productList = (products ?? [])
     .map((p) => `- ${p.name} | ราคา ${p.price} บาท | คงเหลือ ${p.stock} ชิ้น | ${p.description ?? ""}`)
     .join("\n");
 
-  const style = STYLE_PRESETS[settings.ai_style] ?? STYLE_PRESETS.balanced;
+  const style = STYLE_PRESETS[shop.ai_style] ?? STYLE_PRESETS.balanced;
 
-  const systemPrompt = `คุณคือพนักงานขายแชทของร้าน "${settings.shop_name}" หน้าที่ของคุณคือตอบคำถามลูกค้า แนะนำสินค้าที่เหมาะสม และพยายามปิดการขายอย่างเป็นธรรมชาติ ไม่ยัดเยียด
+  const systemPrompt = `คุณคือพนักงานขายแชทของร้าน "${shop.shop_name}" หน้าที่ของคุณคือตอบคำถามลูกค้า แนะนำสินค้าที่เหมาะสม และพยายามปิดการขายอย่างเป็นธรรมชาติ ไม่ยัดเยียด
 
 กฎการตอบ:
 - ตอบเป็นภาษาไทย ${style.tone} ไม่ใช้ bullet ยาวๆ
@@ -50,14 +51,14 @@ export async function generateReply(history: ChatMsg[]): Promise<string> {
 รายการสินค้าปัจจุบัน:
 ${productList || "(ยังไม่มีสินค้าในระบบ)"}
 
-${settings.system_prompt}`;
+${shop.system_prompt}`;
 
-  const provider = (settings.ai_provider as AiProvider) || "anthropic";
+  const provider = (shop.ai_provider as AiProvider) || "anthropic";
 
   try {
-    if (provider === "openai")   return await callOpenAI(settings.openai_api_key, systemPrompt, history, style.temperature);
-    if (provider === "gemini")   return await callGemini(settings.gemini_api_key, systemPrompt, history, style.temperature);
-    return await callAnthropic(settings.anthropic_api_key, systemPrompt, history, style.temperature);
+    if (provider === "openai")   return await callOpenAI(shop.openai_api_key, systemPrompt, history, style.temperature);
+    if (provider === "gemini")   return await callGemini(shop.gemini_api_key, systemPrompt, history, style.temperature);
+    return await callAnthropic(shop.anthropic_api_key, systemPrompt, history, style.temperature);
   } catch (err) {
     console.error(`AI provider (${provider}) error:`, err);
     return "ขอโทษค่ะ ตอนนี้ระบบขัดข้อง รบกวนลองใหม่อีกครั้งนะคะ";
@@ -66,17 +67,18 @@ ${settings.system_prompt}`;
 
 export type { ChatMsg };
 
-export async function getOrCreateCustomer(platform: "facebook" | "line", platformUserId: string, displayName?: string) {
+export async function getOrCreateCustomer(shopId: string, platform: "facebook" | "line", platformUserId: string, displayName?: string) {
   const db = supabaseAdmin();
   const { data: existing } = await db
     .from("customers").select("*")
+    .eq("shop_id", shopId)
     .eq("platform", platform).eq("platform_user_id", platformUserId).maybeSingle();
 
   if (existing) return existing;
 
   const { data: created, error } = await db
     .from("customers")
-    .insert({ platform, platform_user_id: platformUserId, display_name: displayName ?? null })
+    .insert({ shop_id: shopId, platform, platform_user_id: platformUserId, display_name: displayName ?? null })
     .select().single();
 
   if (error) throw error;
