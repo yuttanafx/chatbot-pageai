@@ -545,10 +545,12 @@ export default function AdminPage() {
       setForm(emptyProduct); setEditingId(null);
       setMsg(wasEditing ? "✅ บันทึกการแก้ไขแล้ว" : "✅ เพิ่มสินค้าแล้ว");
       await loadProducts();
+      setTimeout(() => setMsg(""), 3000);
     } else {
-      setMsg("❌ บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง");
+      let detail = "";
+      try { detail = (await res.json()).error ?? ""; } catch {}
+      setMsg(`❌ บันทึกไม่สำเร็จ (${res.status})${detail ? `: ${detail}` : ""}`);
     }
-    setTimeout(() => setMsg(""), 3000);
   }
 
   async function handleDelete(id: string) {

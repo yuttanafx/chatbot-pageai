@@ -76,7 +76,7 @@ on conflict (id) do nothing;
 
 -- อนุญาตให้ upload ได้จาก server (service role)
 create policy "service role upload" on storage.objects
-  for insert to service_role using (bucket_id = 'product-images');
+  for insert to service_role with check (bucket_id = 'product-images');
 
 create policy "public read" on storage.objects
   for select to public using (bucket_id = 'product-images');
