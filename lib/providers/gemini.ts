@@ -1,6 +1,6 @@
 import type { ChatMsg } from "./types";
 
-export async function callGemini(apiKey: string, systemPrompt: string, history: ChatMsg[]): Promise<string> {
+export async function callGemini(apiKey: string, systemPrompt: string, history: ChatMsg[], temperature = 0.6): Promise<string> {
   if (!apiKey) throw new Error("ยังไม่ได้ตั้งค่า Gemini API Key ในหน้า Admin > ตั้งค่า");
 
   const model = "gemini-2.0-flash";
@@ -17,7 +17,7 @@ export async function callGemini(apiKey: string, systemPrompt: string, history: 
     body: JSON.stringify({
       system_instruction: { parts: [{ text: systemPrompt }] },
       contents,
-      generationConfig: { maxOutputTokens: 600 },
+      generationConfig: { maxOutputTokens: 600, temperature },
     }),
   });
 

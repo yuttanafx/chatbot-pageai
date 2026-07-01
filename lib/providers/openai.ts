@@ -1,6 +1,6 @@
 import type { ChatMsg } from "./types";
 
-export async function callOpenAI(apiKey: string, systemPrompt: string, history: ChatMsg[]): Promise<string> {
+export async function callOpenAI(apiKey: string, systemPrompt: string, history: ChatMsg[], temperature = 0.6): Promise<string> {
   if (!apiKey) throw new Error("ยังไม่ได้ตั้งค่า OpenAI API Key ในหน้า Admin > ตั้งค่า");
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -12,6 +12,7 @@ export async function callOpenAI(apiKey: string, systemPrompt: string, history: 
     body: JSON.stringify({
       model: "gpt-4o",
       max_tokens: 600,
+      temperature,
       messages: [{ role: "system", content: systemPrompt }, ...history],
     }),
   });

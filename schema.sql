@@ -45,6 +45,7 @@ create table if not exists shop_settings (
 
   -- AI provider
   ai_provider text default 'anthropic', -- 'anthropic' | 'openai' | 'gemini'
+  ai_style text default 'balanced', -- 'formal' | 'balanced' | 'natural' | 'casual'
 
   -- API keys (เก็บใน DB แทน Vercel env)
   anthropic_api_key text default '',
@@ -63,6 +64,9 @@ create table if not exists shop_settings (
 );
 
 insert into shop_settings (id) values (1) on conflict (id) do nothing;
+
+-- สำหรับฐานข้อมูลที่เคยรัน schema นี้มาก่อน (เพิ่มคอลัมน์ระดับความเป็นธรรมชาติของ AI)
+alter table shop_settings add column if not exists ai_style text default 'balanced';
 
 -- Supabase Storage bucket สำหรับรูปสินค้า
 -- รันใน SQL Editor เช่นกัน

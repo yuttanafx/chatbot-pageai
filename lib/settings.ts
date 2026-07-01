@@ -7,6 +7,7 @@ export type Settings = {
   admin_password_hash: string;
   is_setup_done: boolean;
   ai_provider: string;
+  ai_style: string;
   anthropic_api_key: string;
   openai_api_key: string;
   gemini_api_key: string;

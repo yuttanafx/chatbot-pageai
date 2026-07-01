@@ -5,6 +5,25 @@ import { callOpenAI } from "@/lib/providers/openai";
 import { callGemini } from "@/lib/providers/gemini";
 import type { ChatMsg, AiProvider } from "@/lib/providers/types";
 
+const STYLE_PRESETS: Record<string, { temperature: number; tone: string }> = {
+  formal: {
+    temperature: 0.3,
+    tone: "ตอบแบบทางการ สุภาพเรียบร้อย ประโยคครบถ้วน ไม่ใช้คำย่อหรือภาษาพูดจนเกินไป เหมาะกับร้านที่ขายสินค้าพรีเมียม",
+  },
+  balanced: {
+    temperature: 0.6,
+    tone: "ตอบแบบสุภาพเป็นกันเอง กระชับ ตรงประเด็น เหมือนพนักงานขายมืออาชีพ",
+  },
+  natural: {
+    temperature: 0.85,
+    tone: "ตอบให้เป็นธรรมชาติเหมือนแอดมินจริงกำลังพิมพ์คุยกับลูกค้า ไม่ต้องเป๊ะทุกประโยค อาจมีคำอุทานสั้นๆ เช่น \"เดี๋ยวเช็คให้นะคะ\" แทรกได้บ้าง ใช้คำลงท้ายแบบธรรมชาติ (ค่ะ/ครับ นะคะ/นะครับ) และใส่อิโมจิได้เล็กน้อยเมื่อเหมาะสม",
+  },
+  casual: {
+    temperature: 1.0,
+    tone: "ตอบสั้น กระชับ ผ่อนคลายเหมือนแชทกับเพื่อนสนิท ใช้ภาษาพูดง่ายๆ ใส่อิโมจิได้มากขึ้น ไม่ต้องเป็นทางการเลย แต่ยังคงความสุภาพพื้นฐานไว้",
+  },
+};
+
 export async function generateReply(history: ChatMsg[]): Promise<string> {
   const db = supabaseAdmin();
 
@@ -17,10 +36,12 @@ export async function generateReply(history: ChatMsg[]): Promise<string> {
     .map((p) => `- ${p.name} | ราคา ${p.price} บาท | คงเหลือ ${p.stock} ชิ้น | ${p.description ?? ""}`)
     .join("\n");
 
+  const style = STYLE_PRESETS[settings.ai_style] ?? STYLE_PRESETS.balanced;
+
   const systemPrompt = `คุณคือพนักงานขายแชทของร้าน "${settings.shop_name}" หน้าที่ของคุณคือตอบคำถามลูกค้า แนะนำสินค้าที่เหมาะสม และพยายามปิดการขายอย่างเป็นธรรมชาติ ไม่ยัดเยียด
 
 กฎการตอบ:
-- ตอบเป็นภาษาไทย สุภาพ เป็นกันเอง กระชับ เหมือนแชทคุยกับคนจริง ไม่ใช้ bullet ยาวๆ
+- ตอบเป็นภาษาไทย ${style.tone} ไม่ใช้ bullet ยาวๆ
 - ใช้ข้อมูลสินค้าด้านล่างเท่านั้น ห้ามมั่ว ราคาหรือสต็อกที่ไม่มีในรายการ
 - ถ้าลูกค้าสนใจซื้อ ให้ถามข้อมูลที่จำเป็น (เช่น จำนวน ที่อยู่จัดส่ง) เพื่อพาไปสู่การปิดการขาย
 - ถ้าสินค้าหมดสต็อก ให้แจ้งตามจริงและเสนอสินค้าใกล้เคียงแทน
@@ -34,9 +55,9 @@ ${settings.system_prompt}`;
   const provider = (settings.ai_provider as AiProvider) || "anthropic";
 
   try {
-    if (provider === "openai")   return await callOpenAI(settings.openai_api_key, systemPrompt, history);
-    if (provider === "gemini")   return await callGemini(settings.gemini_api_key, systemPrompt, history);
-    return await callAnthropic(settings.anthropic_api_key, systemPrompt, history);
+    if (provider === "openai")   return await callOpenAI(settings.openai_api_key, systemPrompt, history, style.temperature);
+    if (provider === "gemini")   return await callGemini(settings.gemini_api_key, systemPrompt, history, style.temperature);
+    return await callAnthropic(settings.anthropic_api_key, systemPrompt, history, style.temperature);
   } catch (err) {
     console.error(`AI provider (${provider}) error:`, err);
     return "ขอโทษค่ะ ตอนนี้ระบบขัดข้อง รบกวนลองใหม่อีกครั้งนะคะ";

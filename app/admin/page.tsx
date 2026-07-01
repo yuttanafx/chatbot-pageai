@@ -9,6 +9,7 @@ type Product = {
 };
 type Settings = {
   shop_name: string; system_prompt: string; admin_username: string; ai_provider: string;
+  ai_style: string;
   anthropic_api_key: string; openai_api_key: string; gemini_api_key: string;
   facebook_page_access_token: string; facebook_verify_token: string;
   line_channel_access_token: string; line_channel_secret: string;
@@ -16,115 +17,157 @@ type Settings = {
 const emptyProduct = { name: "", description: "", price: 0, stock: 0, image_url: "", is_active: true };
 
 // ========== Animated Login ==========
-function LoginCanvas() {
+function NeuralCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d")!;
-    let W = canvas.width = window.innerWidth;
-    let H = canvas.height = window.innerHeight;
-    window.addEventListener("resize", () => {
-      W = canvas.width = window.innerWidth;
-      H = canvas.height = window.innerHeight;
-    });
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    let W = (canvas.width = canvas.offsetWidth);
+    let H = (canvas.height = canvas.offsetHeight);
 
-    // Nodes & edges
-    const N = 55;
+    const ro = new ResizeObserver(() => {
+      W = canvas.width = canvas.offsetWidth;
+      H = canvas.height = canvas.offsetHeight;
+    });
+    ro.observe(canvas);
+
+    const N = 60;
     const nodes = Array.from({ length: N }, () => ({
-      x: Math.random() * W, y: Math.random() * H,
-      vx: (Math.random() - 0.5) * 0.4, vy: (Math.random() - 0.5) * 0.4,
-      r: Math.random() * 2 + 1,
+      x: Math.random() * W,
+      y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 0.5,
+      vy: (Math.random() - 0.5) * 0.5,
+      r: Math.random() * 1.5 + 0.8,
       pulse: Math.random() * Math.PI * 2,
+      hue: Math.random() > 0.7 ? 180 : 200,
     }));
 
-    // Flowing data packets
     const packets: { from: number; to: number; t: number; speed: number }[] = [];
     function spawnPacket() {
       const from = Math.floor(Math.random() * N);
-      const to = Math.floor(Math.random() * N);
-      if (from !== to) packets.push({ from, to, t: 0, speed: 0.004 + Math.random() * 0.006 });
+      let to = Math.floor(Math.random() * N);
+      while (to === from) to = Math.floor(Math.random() * N);
+      packets.push({ from, to, t: 0, speed: 0.003 + Math.random() * 0.005 });
     }
-    setInterval(spawnPacket, 400);
+    const spawnInterval = setInterval(spawnPacket, 300);
+
+    function drawHexGrid() {
+      const size = 28;
+      const w = size * 2;
+      const h = Math.sqrt(3) * size;
+      ctx!.strokeStyle = "rgba(0,180,255,0.04)";
+      ctx!.lineWidth = 0.5;
+      for (let row = -1; row < H / h + 1; row++) {
+        for (let col = -1; col < W / w + 1; col++) {
+          const x = col * w * 0.75;
+          const y = row * h + (col % 2 === 0 ? 0 : h / 2);
+          ctx!.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 180) * (60 * i - 30);
+            const px = x + size * Math.cos(angle);
+            const py = y + size * Math.sin(angle);
+            i === 0 ? ctx!.moveTo(px, py) : ctx!.lineTo(px, py);
+          }
+          ctx!.closePath();
+          ctx!.stroke();
+        }
+      }
+    }
 
     let frame = 0;
+    let raf: number;
+
     function draw() {
       frame++;
-      ctx.fillStyle = "rgba(4,10,20,0.18)";
-      ctx.fillRect(0, 0, W, H);
+      ctx!.fillStyle = "rgba(3,8,18,0.22)";
+      ctx!.fillRect(0, 0, W, H);
 
-      // Move nodes
-      nodes.forEach((n) => {
-        n.x += n.vx; n.y += n.vy;
-        n.pulse += 0.03;
-        if (n.x < 0 || n.x > W) n.vx *= -1;
-        if (n.y < 0 || n.y > H) n.vy *= -1;
-      });
+      drawHexGrid();
 
-      // Draw edges
       for (let i = 0; i < N; i++) {
         for (let j = i + 1; j < N; j++) {
           const dx = nodes[i].x - nodes[j].x;
           const dy = nodes[i].y - nodes[j].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 130) {
-            const alpha = (1 - dist / 130) * 0.25;
-            ctx.beginPath();
-            ctx.strokeStyle = `rgba(0,200,255,${alpha})`;
-            ctx.lineWidth = 0.5;
-            ctx.moveTo(nodes[i].x, nodes[i].y);
-            ctx.lineTo(nodes[j].x, nodes[j].y);
-            ctx.stroke();
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d < 120) {
+            const a = (1 - d / 120) * 0.3;
+            ctx!.beginPath();
+            ctx!.strokeStyle = `rgba(0,180,255,${a})`;
+            ctx!.lineWidth = 0.4;
+            ctx!.moveTo(nodes[i].x, nodes[i].y);
+            ctx!.lineTo(nodes[j].x, nodes[j].y);
+            ctx!.stroke();
           }
         }
       }
 
-      // Draw packets
       for (let k = packets.length - 1; k >= 0; k--) {
         const p = packets[k];
         p.t += p.speed;
         if (p.t >= 1) { packets.splice(k, 1); continue; }
-        const from = nodes[p.from]; const to = nodes[p.to];
-        const px = from.x + (to.x - from.x) * p.t;
-        const py = from.y + (to.y - from.y) * p.t;
-        const grd = ctx.createRadialGradient(px, py, 0, px, py, 5);
-        grd.addColorStop(0, "rgba(100,255,220,0.9)");
-        grd.addColorStop(1, "rgba(100,255,220,0)");
-        ctx.beginPath();
-        ctx.fillStyle = grd;
-        ctx.arc(px, py, 5, 0, Math.PI * 2);
-        ctx.fill();
+        const f = nodes[p.from], t = nodes[p.to];
+        const px = f.x + (t.x - f.x) * p.t;
+        const py = f.y + (t.y - f.y) * p.t;
+        for (let trail = 0; trail < 5; trail++) {
+          const tp = Math.max(0, p.t - trail * 0.015);
+          const tx = f.x + (t.x - f.x) * tp;
+          const ty = f.y + (t.y - f.y) * tp;
+          const ta = (0.8 - trail * 0.15) * (1 - p.t);
+          ctx!.beginPath();
+          ctx!.arc(tx, ty, 2 - trail * 0.3, 0, Math.PI * 2);
+          ctx!.fillStyle = `rgba(100,255,200,${ta})`;
+          ctx!.fill();
+        }
+        const grd = ctx!.createRadialGradient(px, py, 0, px, py, 8);
+        grd.addColorStop(0, "rgba(80,255,180,0.8)");
+        grd.addColorStop(1, "rgba(80,255,180,0)");
+        ctx!.beginPath();
+        ctx!.fillStyle = grd;
+        ctx!.arc(px, py, 8, 0, Math.PI * 2);
+        ctx!.fill();
       }
 
-      // Draw nodes
       nodes.forEach((n) => {
-        const glow = 0.5 + 0.5 * Math.sin(n.pulse);
-        const grd = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r * 4);
-        grd.addColorStop(0, `rgba(0,210,255,${0.8 * glow})`);
-        grd.addColorStop(1, "rgba(0,210,255,0)");
-        ctx.beginPath();
-        ctx.fillStyle = grd;
-        ctx.arc(n.x, n.y, n.r * 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.fillStyle = `rgba(180,240,255,${glow})`;
-        ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-        ctx.fill();
+        n.x += n.vx; n.y += n.vy; n.pulse += 0.025;
+        if (n.x < 0 || n.x > W) n.vx *= -1;
+        if (n.y < 0 || n.y > H) n.vy *= -1;
+        const g = 0.4 + 0.6 * Math.abs(Math.sin(n.pulse));
+        const outer = ctx!.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r * 6);
+        outer.addColorStop(0, `rgba(0,${180 + n.hue * 0.4},255,${0.15 * g})`);
+        outer.addColorStop(1, "transparent");
+        ctx!.beginPath(); ctx!.fillStyle = outer;
+        ctx!.arc(n.x, n.y, n.r * 6, 0, Math.PI * 2); ctx!.fill();
+        ctx!.beginPath();
+        ctx!.fillStyle = `rgba(150,230,255,${g})`;
+        ctx!.arc(n.x, n.y, n.r, 0, Math.PI * 2); ctx!.fill();
       });
 
-      // Scan line
-      const scanY = (frame * 0.7) % H;
-      const scanGrd = ctx.createLinearGradient(0, scanY - 40, 0, scanY + 8);
-      scanGrd.addColorStop(0, "rgba(0,200,255,0)");
-      scanGrd.addColorStop(1, "rgba(0,200,255,0.04)");
-      ctx.fillStyle = scanGrd;
-      ctx.fillRect(0, scanY - 40, W, 48);
+      const sy = ((frame * 0.5) % (H + 60)) - 30;
+      const sg = ctx!.createLinearGradient(0, sy, 0, sy + 60);
+      sg.addColorStop(0, "transparent");
+      sg.addColorStop(0.5, "rgba(0,200,255,0.035)");
+      sg.addColorStop(1, "transparent");
+      ctx!.fillStyle = sg; ctx!.fillRect(0, sy, W, 60);
 
-      requestAnimationFrame(draw);
+      ["left", "right"].forEach((side) => {
+        const gx = side === "left" ? 0 : W;
+        const bg = ctx!.createLinearGradient(gx, 0, side === "left" ? 80 : W - 80, 0);
+        bg.addColorStop(0, `rgba(0,150,255,${0.06 + 0.03 * Math.sin(frame * 0.01)})`);
+        bg.addColorStop(1, "transparent");
+        ctx!.fillStyle = bg; ctx!.fillRect(side === "left" ? 0 : W - 80, 0, 80, H);
+      });
+
+      raf = requestAnimationFrame(draw);
     }
     draw();
+
+    return () => { cancelAnimationFrame(raf); clearInterval(spawnInterval); ro.disconnect(); };
   }, []);
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />;
+
+  return <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />;
 }
 
 function LoginForm({ onLogin }: { onLogin: () => void }) {
@@ -154,80 +197,149 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
   }
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#040a14]">
-      <LoginCanvas />
+    <div style={{ position: "relative", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#030812", overflow: "hidden" }}>
+      <NeuralCanvas />
 
       {/* Grid overlay */}
-      <div className="absolute inset-0 pointer-events-none"
-        style={{ backgroundImage: "linear-gradient(rgba(0,180,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,180,255,0.04) 1px,transparent 1px)", backgroundSize: "40px 40px" }} />
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none",
+        backgroundImage: "linear-gradient(rgba(0,160,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,160,255,0.03) 1px, transparent 1px)",
+        backgroundSize: "36px 36px"
+      }} />
+
+      {/* Radial center glow */}
+      <div style={{
+        position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)",
+        width: 500, height: 500, borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(0,100,255,0.06) 0%, transparent 70%)",
+        pointerEvents: "none"
+      }} />
 
       {/* Card */}
-      <div className="relative z-10 w-full max-w-sm mx-4">
-        {/* Glow ring */}
-        <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-cyan-400/40 via-transparent to-blue-500/30 blur-sm" />
-        <div className="relative rounded-2xl border border-cyan-500/30 bg-[#06101e]/90 backdrop-blur-xl p-8">
+      <div style={{ position: "relative", zIndex: 10, width: "100%", maxWidth: 360, margin: "0 16px" }}>
+        <div style={{
+          position: "absolute", inset: -1, borderRadius: 20,
+          background: "linear-gradient(135deg, rgba(0,200,255,0.5), rgba(0,80,255,0.2), rgba(0,200,255,0.3))",
+          filter: "blur(1px)"
+        }} />
+        <div style={{
+          position: "relative", borderRadius: 20,
+          border: "1px solid rgba(0,180,255,0.25)",
+          background: "rgba(5,14,28,0.92)",
+          backdropFilter: "blur(20px)",
+          padding: "32px 28px"
+        }}>
+          <div style={{ position: "absolute", top: 0, left: 0, width: 20, height: 20, borderTop: "2px solid rgba(0,220,255,0.7)", borderLeft: "2px solid rgba(0,220,255,0.7)", borderRadius: "4px 0 0 0" }} />
+          <div style={{ position: "absolute", top: 0, right: 0, width: 20, height: 20, borderTop: "2px solid rgba(0,220,255,0.7)", borderRight: "2px solid rgba(0,220,255,0.7)", borderRadius: "0 4px 0 0" }} />
+          <div style={{ position: "absolute", bottom: 0, left: 0, width: 20, height: 20, borderBottom: "2px solid rgba(0,220,255,0.4)", borderLeft: "2px solid rgba(0,220,255,0.4)", borderRadius: "0 0 0 4px" }} />
+          <div style={{ position: "absolute", bottom: 0, right: 0, width: 20, height: 20, borderBottom: "2px solid rgba(0,220,255,0.4)", borderRight: "2px solid rgba(0,220,255,0.4)", borderRadius: "0 0 4px 0" }} />
 
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center">
-              <span className="text-cyan-300 text-sm">⬡</span>
-            </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: "linear-gradient(135deg, rgba(0,180,255,0.3), rgba(0,80,200,0.2))",
+              border: "1px solid rgba(0,200,255,0.4)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16
+            }}>⬡</div>
             <div>
-              <p className="text-cyan-400 text-xs tracking-widest uppercase">AI SALES SYSTEM</p>
-              <p className="text-white/80 text-xs">ระบบตอบแชทอัตโนมัติ</p>
+              <div style={{ color: "rgba(0,200,255,0.9)", fontSize: 9, letterSpacing: "0.18em", fontWeight: 600 }}>AI SALES SYSTEM</div>
+              <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, marginTop: 1 }}>ระบบตอบแชทอัตโนมัติ</div>
+            </div>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+              {[0, 1, 2].map((i) => (
+                <div key={i} style={{
+                  width: 5, height: 5, borderRadius: "50%",
+                  background: "rgba(0,220,255,0.7)",
+                  animation: `loginPulse 1.4s ease-in-out ${i * 0.2}s infinite`
+                }} />
+              ))}
             </div>
           </div>
 
           {firstSetup ? (
-            <div className="text-center py-4">
-              <div className="text-4xl mb-3">✅</div>
-              <p className="text-cyan-300 font-medium">ตั้งค่าสำเร็จ!</p>
-              <p className="text-white/40 text-xs mt-1">กำลังเข้าสู่ระบบ...</p>
+            <div style={{ textAlign: "center", padding: "16px 0" }}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
+              <p style={{ color: "rgba(0,220,255,0.9)", fontWeight: 600, margin: 0 }}>ตั้งค่าสำเร็จ!</p>
+              <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginTop: 4 }}>กำลังเข้าสู่ระบบ...</p>
             </div>
           ) : (
             <>
-              <h1 className="text-white text-xl font-semibold mb-5">เข้าสู่ระบบ</h1>
-              <form onSubmit={handleSubmit} className="grid gap-3">
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500/60 text-xs">USER</span>
+              <h1 style={{ color: "rgba(255,255,255,0.95)", fontSize: 20, fontWeight: 600, margin: "0 0 20px 0" }}>เข้าสู่ระบบ</h1>
+
+              <form onSubmit={handleSubmit}>
+                <div style={{ position: "relative", marginBottom: 12 }}>
+                  <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "rgba(0,200,255,0.5)", fontSize: 9, fontWeight: 700, letterSpacing: "0.1em" }}>USER</div>
                   <input
                     value={username} onChange={(e) => setUsername(e.target.value)}
-                    placeholder="username"
-                    className="w-full bg-white/5 border border-cyan-500/20 rounded-lg pl-14 pr-4 py-2.5 text-white text-sm outline-none focus:border-cyan-400/60 placeholder:text-white/20 font-mono"
-                    autoFocus
+                    placeholder="username" autoFocus
+                    style={{
+                      width: "100%", boxSizing: "border-box",
+                      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(0,180,255,0.2)",
+                      borderRadius: 10, paddingLeft: 48, paddingRight: 12, paddingTop: 10, paddingBottom: 10,
+                      color: "rgba(255,255,255,0.9)", fontSize: 13, fontFamily: "monospace", outline: "none"
+                    }}
                   />
                 </div>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500/60 text-xs">PASS</span>
+
+                <div style={{ position: "relative", marginBottom: 16 }}>
+                  <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "rgba(0,200,255,0.5)", fontSize: 9, fontWeight: 700, letterSpacing: "0.1em" }}>PASS</div>
                   <input
                     type="password" value={password} onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-white/5 border border-cyan-500/20 rounded-lg pl-14 pr-4 py-2.5 text-white text-sm outline-none focus:border-cyan-400/60 placeholder:text-white/30 font-mono"
+                    style={{
+                      width: "100%", boxSizing: "border-box",
+                      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(0,180,255,0.2)",
+                      borderRadius: 10, paddingLeft: 48, paddingRight: 12, paddingTop: 10, paddingBottom: 10,
+                      color: "rgba(255,255,255,0.9)", fontSize: 13, fontFamily: "monospace", outline: "none"
+                    }}
                   />
                 </div>
+
                 {error && (
-                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
-                    <p className="text-red-400 text-xs">{error}</p>
+                  <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 10, padding: "8px 12px", marginBottom: 12 }}>
+                    <p style={{ color: "rgb(248,113,113)", fontSize: 12, margin: 0 }}>{error}</p>
                   </div>
                 )}
+
                 <button
-                  disabled={loading}
-                  className="mt-1 w-full py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-sm font-medium hover:opacity-90 transition disabled:opacity-40 relative overflow-hidden group"
+                  type="submit" disabled={loading}
+                  style={{
+                    width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
+                    background: loading ? "rgba(0,120,200,0.4)" : "linear-gradient(90deg, #0080cc, #0040aa, #0080cc)",
+                    backgroundSize: "200% 100%",
+                    color: "white", fontSize: 13, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer",
+                    position: "relative", overflow: "hidden"
+                  }}
                 >
-                  <span className="relative z-10">{loading ? "กำลังตรวจสอบ..." : "เข้าสู่ระบบ"}</span>
-                  <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition" />
+                  {loading ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                      <span>กำลังตรวจสอบ</span>
+                      <span style={{ display: "inline-flex", gap: 3 }}>
+                        {[0, 1, 2].map((i) => <span key={i} style={{ width: 4, height: 4, borderRadius: "50%", background: "white", display: "inline-block", opacity: 0.6 }} />)}
+                      </span>
+                    </span>
+                  ) : "เข้าสู่ระบบ"}
                 </button>
               </form>
-              <p className="text-white/20 text-xs text-center mt-4">
+
+              <p style={{ color: "rgba(255,255,255,0.15)", fontSize: 10, textAlign: "center", marginTop: 16, marginBottom: 0 }}>
                 เข้าครั้งแรก? ใส่ username/password ที่ต้องการได้เลย
               </p>
             </>
           )}
         </div>
       </div>
+
+      <style>{`
+        @keyframes loginPulse {
+          0%, 100% { opacity: 0.3; transform: scale(0.8); }
+          50% { opacity: 1; transform: scale(1.2); }
+        }
+      `}</style>
     </div>
   );
 }
+
 
 // ========== Image Upload Component ==========
 function ImageUpload({ value, onChange }: { value: string; onChange: (url: string) => void }) {
@@ -333,6 +445,17 @@ function SettingsTab() {
           </select>
         </div>
         <div>
+          <label className="block text-xs text-ink/50 mb-1">ระดับความเป็นธรรมชาติในการตอบ</label>
+          <select value={s.ai_style ?? "balanced"} onChange={(e) => setS({ ...s, ai_style: e.target.value })}
+            className="w-full border border-line rounded-lg px-3 py-2 text-sm outline-none focus:border-moss">
+            <option value="formal">เป็นทางการ — สุภาพเรียบร้อย เหมาะกับสินค้าพรีเมียม</option>
+            <option value="balanced">สมดุล (แนะนำ) — สุภาพเป็นกันเอง กระชับ</option>
+            <option value="natural">เป็นธรรมชาติ — คุยเหมือนแอดมินจริง มีลูกเล่นบ้าง</option>
+            <option value="casual">กันเองมาก — สั้น กระชับ อิโมจิเยอะ เหมือนแชทเพื่อน</option>
+          </select>
+          <p className="text-xs text-ink/30 mt-1">ปรับโทนการตอบของ AI เวลาคุยกับลูกค้าใน Messenger/LINE</p>
+        </div>
+        <div>
           <label className="block text-xs text-ink/50 mb-1">คำสั่งพิเศษ AI (โปรโมชั่น, นโยบายจัดส่ง ฯลฯ)</label>
           <textarea value={s.system_prompt ?? ""} rows={3}
             onChange={(e) => setS({ ...s, system_prompt: e.target.value })}
@@ -400,6 +523,7 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyProduct);
   const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
 
   async function loadProducts() {
     const res = await fetch("/api/admin/products");
@@ -411,13 +535,20 @@ export default function AdminPage() {
   useEffect(() => { loadProducts(); }, []);
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setLoading(true);
-    if (editingId) {
-      await fetch(`/api/admin/products/${editingId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    e.preventDefault(); setLoading(true); setMsg("");
+    const wasEditing = !!editingId;
+    const res = editingId
+      ? await fetch(`/api/admin/products/${editingId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) })
+      : await fetch("/api/admin/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    setLoading(false);
+    if (res.ok) {
+      setForm(emptyProduct); setEditingId(null);
+      setMsg(wasEditing ? "✅ บันทึกการแก้ไขแล้ว" : "✅ เพิ่มสินค้าแล้ว");
+      await loadProducts();
     } else {
-      await fetch("/api/admin/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      setMsg("❌ บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง");
     }
-    setForm(emptyProduct); setEditingId(null); setLoading(false); await loadProducts();
+    setTimeout(() => setMsg(""), 3000);
   }
 
   async function handleDelete(id: string) {
@@ -458,20 +589,29 @@ export default function AdminPage() {
             />
 
             <div className="grid sm:grid-cols-2 gap-3">
-              <input required placeholder="ชื่อสินค้า" value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="border border-line rounded-lg px-3 py-2 text-sm outline-none focus:border-moss" />
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink/30 text-xs">฿</span>
-                <input type="number" min="0" placeholder="ราคา" value={form.price || ""}
-                  onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
-                  className="w-full border border-line rounded-lg pl-7 pr-3 py-2 text-sm outline-none focus:border-moss" />
-              </div>
-              <div className="relative">
-                <input type="number" min="0" placeholder="จำนวนคงเหลือ" value={form.stock || ""}
-                  onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })}
+              <div>
+                <label className="block text-xs text-ink/50 mb-1">ชื่อสินค้า</label>
+                <input required placeholder="เช่น เสื้อยืดคอกลม" value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="w-full border border-line rounded-lg px-3 py-2 text-sm outline-none focus:border-moss" />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/30 text-xs">ชิ้น</span>
+              </div>
+              <div>
+                <label className="block text-xs text-ink/50 mb-1">ราคา (บาท)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink/30 text-xs">฿</span>
+                  <input type="number" min="0" placeholder="0" value={form.price || ""}
+                    onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+                    className="w-full border border-line rounded-lg pl-7 pr-3 py-2 text-sm outline-none focus:border-moss" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-ink/50 mb-1">จำนวนคงเหลือ</label>
+                <div className="relative">
+                  <input type="number" min="0" placeholder="0" value={form.stock || ""}
+                    onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })}
+                    className="w-full border border-line rounded-lg px-3 py-2 pr-12 text-sm outline-none focus:border-moss" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/30 text-xs">ชิ้น</span>
+                </div>
               </div>
             </div>
 
@@ -484,14 +624,15 @@ export default function AdminPage() {
                 onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
               เปิดขาย (AI จะแนะนำสินค้านี้ให้ลูกค้า)
             </label>
-            <div className="flex gap-3">
+            <div className="flex items-center gap-4">
               <button disabled={loading} className="bg-ink text-paper rounded-lg px-5 py-2 text-sm hover:bg-moss transition disabled:opacity-50">
-                {editingId ? "บันทึก" : "เพิ่มสินค้า"}
+                {loading ? "กำลังบันทึก..." : editingId ? "บันทึก" : "เพิ่มสินค้า"}
               </button>
               {editingId && (
                 <button type="button" onClick={() => { setEditingId(null); setForm(emptyProduct); }}
                   className="text-sm text-ink/40 hover:text-clay">ยกเลิก</button>
               )}
+              {msg && <span className="text-sm">{msg}</span>}
             </div>
           </form>
 

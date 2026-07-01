@@ -19,6 +19,7 @@ export async function GET() {
     system_prompt: s.system_prompt,
     admin_username: s.admin_username,
     ai_provider: s.ai_provider,
+    ai_style: s.ai_style,
     anthropic_api_key: maskKey(s.anthropic_api_key),
     openai_api_key: maskKey(s.openai_api_key),
     gemini_api_key: maskKey(s.gemini_api_key),
@@ -39,6 +40,7 @@ export async function PUT(req: NextRequest) {
   if (body.shop_name     !== undefined) patch.shop_name     = body.shop_name;
   if (body.system_prompt !== undefined) patch.system_prompt = body.system_prompt;
   if (body.ai_provider   !== undefined) patch.ai_provider   = body.ai_provider;
+  if (body.ai_style      !== undefined) patch.ai_style      = body.ai_style;
 
   // API keys — บันทึกเฉพาะถ้าไม่ใช่ค่า masked (•••)
   const rawFields = [
